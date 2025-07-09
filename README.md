@@ -47,6 +47,31 @@ cp env.example .env
 npm run build
 ```
 
+## Getting Your Tweet Data
+
+This tool is designed to work with your personal X (formerly Twitter) data archive.
+
+### 1. Download Your Archive from X
+
+1.  Log in to your X account on the web or mobile app.
+2.  Go to **Settings and privacy**.
+3.  Select **Your account**.
+4.  Choose **Download an archive of your data**.
+5.  Confirm your password and request the archive. You will receive an email or in-app notification when your archive is ready.
+6.  Download the `.zip` file containing your data.
+
+### 2. Prepare `tweets.json`
+
+Inside the downloaded archive, you will find a `data/tweets.js` file. This is a JavaScript file, not a valid JSON file. You need to modify it to create a `tweets.json` file that this tool can use.
+
+1.  Unzip the archive you downloaded from X.
+2.  Find the file located at `data/tweets.js`.
+3.  This file contains your tweets assigned to a `window.YTD.tweets.part0` variable. Open it in a text editor.
+4.  Remove the `window.YTD.tweets.part0 = ` prefix from the beginning of the file to leave only the raw JSON array of tweets.
+5.  Save this modified file as `tweets.json` in the root of this project.
+
+After performing these steps and setting up your environment variables as described below, you can ingest your tweets.
+
 ## Configuration
 
 Create a `.env` file in the root directory with the following variables:
