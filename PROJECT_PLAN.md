@@ -84,7 +84,15 @@ tweet-search-cli/
 - `env.example` - Environment variable template
 - `README.md` - Project documentation
 
-## Phase 2: Data Architecture 🔜
+## Phase 2: Data Architecture ✅
+
+**Date Completed**: January 2025
+
+**Key Accomplishments:**
+
+- ✅ All TypeScript interfaces (`TweetData`, `ProcessedTweet`, `TurbopufferRow`, `SearchOptions`) are defined in `src/types/index.ts`.
+- ✅ Data structures accurately reflect the source tweet format and the target format for Turbopuffer.
+- ✅ Type safety is established across the entire data processing pipeline.
 
 ### TypeScript Interfaces
 
@@ -152,35 +160,43 @@ interface SearchOptions {
 }
 ```
 
-## Phase 3: Core Processing Pipeline 🔜
+## Phase 3: Core Processing Pipeline ✅
+
+**Date Completed**: January 2025
+
+**Key Accomplishments:**
+
+- ✅ **Tweet Ingestion**: Robustly loads tweets from JSON, validates data structures, and handles invalid records gracefully (`tweets.ts`).
+- ✅ **Embedding Generation**: Integrates with OpenAI `text-embedding-3-small` model, featuring batch processing, rate-limiting, and retry logic (`embeddings.ts`).
+- ✅ **Data Transformation**: Efficiently processes raw tweet data into a clean, searchable format for Turbopuffer (`tweets.ts`).
 
 ### Tweet Ingestion Module
 
-- [ ] JSON file reader with validation
-- [ ] Tweet data structure validation
-- [ ] Progress tracking for large datasets
-- [ ] Error handling and recovery
+- [x] JSON file reader with validation
+- [x] Tweet data structure validation
+- [x] Progress tracking for large datasets
+- [x] Error handling and recovery
 
 ### Embedding Generation
 
-- [ ] OpenAI API integration
-- [ ] Batch processing for efficiency
-- [ ] Rate limiting and retry logic
-- [ ] Cost optimization (use text-embedding-3-small)
+- [x] OpenAI API integration
+- [x] Batch processing for efficiency
+- [x] Rate limiting and retry logic
+- [x] Cost optimization (use text-embedding-3-small)
 
 ### Data Transformation
 
-- [ ] Convert tweets to turbopuffer format
-- [ ] Handle missing or malformed data
-- [ ] Prepare metadata for filtering
-- [ ] Parse Twitter date format ("Tue Jul 08 13:40:22 +0000 2025") to ISO strings
-- [ ] Convert string numbers (favorite_count, retweet_count) to integers
-- [ ] Extract boolean flags for content types (has_urls, has_mentions, has_hashtags)
-- [ ] Handle nested tweet.entities structure for URL/mention/hashtag detection
-- [ ] Validate required fields (id_str, full_text, created_at)
-- [ ] Skip processing language and sensitivity fields (not needed for search)
+- [x] Convert tweets to turbopuffer format
+- [x] Handle missing or malformed data
+- [x] Prepare metadata for filtering
+- [x] Parse Twitter date format ("Tue Jul 08 13:40:22 +0000 2025") to ISO strings
+- [x] Convert string numbers (favorite_count, retweet_count) to integers
+- [x] Extract boolean flags for content types (has_urls, has_mentions, has_hashtags)
+- [x] Handle nested tweet.entities structure for URL/mention/hashtag detection
+- [x] Validate required fields (id_str, full_text, created_at)
+- [x] Skip processing language and sensitivity fields (not needed for search)
 
-## Phase 4: Turbopuffer Integration 🔜
+## Phase 4: Turbopuffer Integration 🟡 In Progress
 
 ### Schema Configuration
 
@@ -219,13 +235,13 @@ const schema = {
 
 ### Client Wrapper Tasks
 
-- [ ] Turbopuffer client initialization
-- [ ] Namespace management
-- [ ] Batch upsert operations
+- [x] Turbopuffer client initialization
+- [x] Namespace management
+- [x] Batch upsert operations
 - [ ] Query interface with filtering
-- [ ] Error handling and retries
+- [x] Error handling and retries
 
-## Phase 5: CLI Interface 🔜
+## Phase 5: CLI Interface 🟡 In Progress
 
 ### Command Structure
 
@@ -244,10 +260,10 @@ Options:
 
 ### Command Implementation
 
-- [ ] Main CLI entry point with commander.js
-- [ ] Help documentation and examples
-- [ ] Configuration file support
-- [ ] Environment variable handling
+- [x] Main CLI entry point with commander.js
+- [x] Help documentation and examples
+- [ ] Configuration file support (Deferred)
+- [x] Environment variable handling
 
 ## Phase 6: Search Features 🔜
 
@@ -444,7 +460,11 @@ This plan serves as a living document that will be updated as the project progre
 
 **✅ Phase 1 Complete**: Project foundation established with TypeScript setup, CLI framework, and all dependencies installed.
 
-**🔜 Next: Phase 2-3**: Ready to implement core processing pipeline with tweet ingestion, embedding generation, and data transformation.
+**✅ Phase 2-3 Complete**: Core data architecture and processing pipeline are implemented. Turbopuffer ingestion is functional.
+
+**🟡 Phase 4-5 In Progress**: Turbopuffer client can upsert data, and the `ingest` command is fully functional.
+
+**🔜 Next: Phase 4 & 6**: Complete the Turbopuffer query interface and build out the search features.
 
 ## Technical Specifications
 
