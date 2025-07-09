@@ -1,11 +1,11 @@
 {
-  "name": "tweet-search-cli",
+  "name": "tpuf-tweets",
   "version": "1.0.0",
   "description": "A TypeScript CLI tool for ingesting tweets, generating embeddings, and performing hybrid search using turbopuffer",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "tweet-search": "./dist/index.js"
+    "tpuf-tweets": "./dist/index.js"
   },
   "scripts": {
     "build": "tsc",

@@ -1,4 +1,4 @@
-# Tweet Search CLI
+# tpuf tweets
 
 A TypeScript CLI tool that ingests tweets, generates embeddings using OpenAI, stores them in turbopuffer with full-text search capabilities, and provides a hybrid search interface.
 
@@ -25,7 +25,7 @@ A TypeScript CLI tool that ingests tweets, generates embeddings using OpenAI, st
 
 ```bash
 git clone <repository-url>
-cd tweet-search-cli
+cd tpuf-tweets
 ```
 
 2. Install dependencies:
@@ -90,7 +90,7 @@ Note: The `--` is important as it separates arguments meant for `npm` from argum
 npm run link
 
 # Use from anywhere
-tweet-search <command> [options]
+tpuf-tweets <command> [options]
 
 # Remove global installation
 npm run unlink
@@ -105,7 +105,7 @@ npm run unlink
 npm run cli -- ingest tweets.json
 
 # If globally installed
-tweet-search ingest tweets.json
+tpuf-tweets ingest tweets.json
 
 # Test with limited number of tweets
 npm run cli -- ingest tweets.json --limit 10
@@ -118,7 +118,7 @@ npm run cli -- ingest tweets.json --limit 5 --dry-run --skip-embeddings
 
 ```bash
 npm run cli -- search
-# Or if globally installed: tweet-search search
+# Or if globally installed: tpuf-tweets search
 ```
 
 #### Direct Query
@@ -192,7 +192,7 @@ The tool expects tweets in the following JSON format:
 ### Project Structure
 
 ```
-tweet-search-cli/
+tpuf-tweets/
 ├── src/
 │   ├── commands/          # CLI command implementations
 │   │   ├── ingest.ts      # Tweet ingestion command

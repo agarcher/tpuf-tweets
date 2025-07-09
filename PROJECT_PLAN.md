@@ -1,4 +1,4 @@
-# Tweet Search CLI with Turbopuffer - Project Plan
+# TpuF Tweets with Turbopuffer - Project Plan
 
 ## Overview
 
@@ -7,7 +7,7 @@ Build a TypeScript CLI tool that ingests tweets, generates embeddings using Open
 ## Project Structure
 
 ```
-tweet-search-cli/
+tpuf-tweets/
 ├── src/
 │   ├── commands/
 │   │   ├── ingest.ts      # Tweet ingestion command
@@ -248,7 +248,7 @@ const schema = {
 ### Command Structure
 
 ```bash
-tweet-search <command> [options]
+tpuf-tweets <command> [options]
 
 Commands:
   ingest [file]           Ingest tweets from JSON file
@@ -286,19 +286,19 @@ Options:
 
 ```bash
 # Ingest tweets
-npx tweet-search ingest tweets.json
+npx tpuf-tweets ingest tweets.json
 
 # Interactive search
-npx tweet-search search
+npx tpuf-tweets search
 
 # Direct semantic search
-npx tweet-search query "machine learning" --type semantic --limit 10
+npx tpuf-tweets query "machine learning" --type semantic --limit 10
 
 # Hybrid search with date filter
-npx tweet-search query "AI trends" --type hybrid --after 2023-01-01 --before 2023-12-31
+npx tpuf-tweets query "AI trends" --type hybrid --after 2023-01-01 --before 2023-12-31
 
 # Keyword search
-npx tweet-search query "typescript" --type keyword --limit 5
+npx tpuf-tweets query "typescript" --type keyword --limit 5
 ```
 
 ## Phase 7: Advanced Features 🔜
@@ -346,7 +346,7 @@ npx tweet-search query "typescript" --type keyword --limit 5
 ### README Structure
 
 ```markdown
-# Tweet Search CLI
+# tpuf tweets
 
 ## Installation
 
