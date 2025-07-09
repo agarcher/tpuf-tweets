@@ -196,9 +196,11 @@ interface SearchOptions {
 - [x] Validate required fields (id_str, full_text, created_at)
 - [x] Skip processing language and sensitivity fields (not needed for search)
 
-## Phase 4: Turbopuffer Integration 🟡 In Progress
+## Phase 4: Turbopuffer Integration ✅
 
 ### Schema Configuration
+
+While the `upsert` call only explicitly defines the schema for the `text` attribute, Turbopuffer automatically infers the data types for all other attributes, making them available for filtering. The effective schema that supports metadata filtering is as follows:
 
 ```typescript
 const schema = {
@@ -207,7 +209,7 @@ const schema = {
     full_text_search: true,
   },
   created_at: {
-    type: "string", // ISO date string for filtering
+    type: "datetime",
     filterable: true,
   },
   favorite_count: {
@@ -238,10 +240,10 @@ const schema = {
 - [x] Turbopuffer client initialization
 - [x] Namespace management
 - [x] Batch upsert operations
-- [ ] Query interface with filtering
+- [x] Query interface with filtering
 - [x] Error handling and retries
 
-## Phase 5: CLI Interface 🟡 In Progress
+## Phase 5: CLI Interface ✅
 
 ### Command Structure
 
@@ -269,9 +271,9 @@ Options:
 
 ### Search Types
 
-1. **Semantic Search**: Vector similarity using embeddings
-2. **Keyword Search**: BM25 full-text search
-3. **Hybrid Search**: Combined vector + full-text + date filtering
+1.  **Semantic Search**: Vector similarity using embeddings
+2.  **Keyword Search**: BM25 full-text search
+3.  **Hybrid Search**: Combined vector + full-text
 
 ### Search Interface
 
@@ -462,9 +464,11 @@ This plan serves as a living document that will be updated as the project progre
 
 **✅ Phase 2-3 Complete**: Core data architecture and processing pipeline are implemented. Turbopuffer ingestion is functional.
 
-**🟡 Phase 4-5 In Progress**: Turbopuffer client can upsert data, and the `ingest` command is fully functional.
+**✅ Phase 4 Complete**: The Turbopuffer client wrapper is fully implemented, with support for `upsert` and `query` with metadata filters.
 
-**🔜 Next: Phase 4 & 6**: Complete the Turbopuffer query interface and build out the search features.
+**✅ Phase 5 Complete**: The CLI is functional with a complete `ingest` command and a full-featured `query` command that supports semantic, keyword, and hybrid search with filters.
+
+**🔜 Next: Phase 6**: Implement the interactive search interface (`search` command).
 
 ## Technical Specifications
 

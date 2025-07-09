@@ -50,7 +50,8 @@ export interface TurbopufferRow {
 }
 
 export interface SearchOptions {
-  query: string;
+  query?: string;
+  vector?: number[];
   type: "semantic" | "keyword" | "hybrid";
   dateAfter?: string;
   dateBefore?: string;

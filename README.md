@@ -77,9 +77,11 @@ npm run watch
 2. **Direct CLI Usage** - Run commands directly from source:
 
 ```bash
-npm run cli <command> [options]
-# Example: npm run cli search "my query"
+npm run cli -- <command> [options]
+# Example: npm run cli -- query my query
 ```
+
+Note: The `--` is important as it separates arguments meant for `npm` from arguments meant for your script. This ensures that options are passed correctly to your CLI tool instead of being intercepted by npm.
 
 3. **Global Installation** - Make the CLI available system-wide:
 
@@ -100,22 +102,22 @@ npm run unlink
 
 ```bash
 # Using direct CLI
-npm run cli ingest tweets.json
+npm run cli -- ingest tweets.json
 
 # If globally installed
 tweet-search ingest tweets.json
 
 # Test with limited number of tweets
-npm run cli ingest tweets.json --limit 10
+npm run cli -- ingest tweets.json --limit 10
 
 # Test with dry run and limited tweets
-npm run cli ingest tweets.json --limit 5 --dry-run --skip-embeddings
+npm run cli -- ingest tweets.json --limit 5 --dry-run --skip-embeddings
 ```
 
 #### Interactive Search
 
 ```bash
-npm run cli search
+npm run cli -- search
 # Or if globally installed: tweet-search search
 ```
 
@@ -123,13 +125,13 @@ npm run cli search
 
 ```bash
 # Semantic search
-npm run cli query "machine learning" --type semantic --limit 10
+npm run cli -- query "machine learning" --type semantic --limit 10
 
 # Hybrid search with date filter
-npm run cli query "AI trends" --type hybrid --after 2023-01-01 --before 2023-12-31
+npm run cli -- query "AI trends" --type hybrid --after 2023-01-01 --before 2023-12-31
 
 # Keyword search
-npm run cli query "typescript" --type keyword --limit 5
+npm run cli -- query "typescript" --type keyword --limit 5
 ```
 
 ### Query Options
@@ -183,7 +185,7 @@ The tool expects tweets in the following JSON format:
 - `npm run build` - Build the TypeScript project
 - `npm run watch` - Watch mode: automatically rebuild on changes
 - `npm run clean` - Clean the build directory
-- `npm run cli` - Run CLI commands directly from TypeScript source
+- `npm run cli --` - Run CLI commands directly from TypeScript source
 - `npm run link` - Install the CLI globally
 - `npm run unlink` - Remove global CLI installation
 
