@@ -1,0 +1,42 @@
+{
+  "name": "tweet-search-cli",
+  "version": "1.0.0",
+  "description": "A TypeScript CLI tool for ingesting tweets, generating embeddings, and performing hybrid search using turbopuffer",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "tweet-search": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "clean": "rm -rf dist"
+  },
+  "keywords": [
+    "cli",
+    "tweets",
+    "search",
+    "embeddings",
+    "turbopuffer",
+    "typescript"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "@turbopuffer/turbopuffer": "latest",
+    "openai": "latest",
+    "commander": "latest",
+    "dotenv": "latest",
+    "chalk": "latest",
+    "ora": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "typescript": "latest",
+    "tsx": "latest"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
