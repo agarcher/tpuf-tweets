@@ -5,13 +5,15 @@
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "tweet-search": "dist/index.js"
+    "tweet-search": "./dist/index.js"
   },
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js",
-    "dev": "tsx src/index.ts",
-    "clean": "rm -rf dist"
+    "watch": "tsc --watch",
+    "clean": "rm -rf dist",
+    "link": "npm link",
+    "unlink": "npm unlink",
+    "cli": "tsx src/index.ts"
   },
   "keywords": [
     "cli",
@@ -21,7 +23,7 @@
     "turbopuffer",
     "typescript"
   ],
-  "author": "Your Name",
+  "author": "Adam Archer",
   "license": "MIT",
   "dependencies": {
     "@turbopuffer/turbopuffer": "latest",

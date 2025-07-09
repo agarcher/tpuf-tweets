@@ -64,21 +64,34 @@ OPENAI_MODEL=text-embedding-3-small
 
 ## Usage
 
-### Development
+### Development Workflow
 
-Run the CLI in development mode:
+There are several ways to run the CLI during development:
+
+1. **Watch Mode** - Automatically rebuild on changes:
 
 ```bash
-npm run dev <command> [options]
+npm run watch
 ```
 
-### Production
-
-Build and run the CLI:
+2. **Direct CLI Usage** - Run commands directly from source:
 
 ```bash
-npm run build
-npm start <command> [options]
+npm run cli <command> [options]
+# Example: npm run cli search "my query"
+```
+
+3. **Global Installation** - Make the CLI available system-wide:
+
+```bash
+# Install globally
+npm run link
+
+# Use from anywhere
+tweet-search <command> [options]
+
+# Remove global installation
+npm run unlink
 ```
 
 ### Commands
@@ -86,33 +99,37 @@ npm start <command> [options]
 #### Ingest Tweets
 
 ```bash
-# Full ingestion
-npx tweet-search ingest tweets.json
+# Using direct CLI
+npm run cli ingest tweets.json
+
+# If globally installed
+tweet-search ingest tweets.json
 
 # Test with limited number of tweets
-npx tweet-search ingest tweets.json --limit 10
+npm run cli ingest tweets.json --limit 10
 
 # Test with dry run and limited tweets
-npx tweet-search ingest tweets.json --limit 5 --dry-run --skip-embeddings
+npm run cli ingest tweets.json --limit 5 --dry-run --skip-embeddings
 ```
 
 #### Interactive Search
 
 ```bash
-npx tweet-search search
+npm run cli search
+# Or if globally installed: tweet-search search
 ```
 
 #### Direct Query
 
 ```bash
 # Semantic search
-npx tweet-search query "machine learning" --type semantic --limit 10
+npm run cli query "machine learning" --type semantic --limit 10
 
 # Hybrid search with date filter
-npx tweet-search query "AI trends" --type hybrid --after 2023-01-01 --before 2023-12-31
+npm run cli query "AI trends" --type hybrid --after 2023-01-01 --before 2023-12-31
 
 # Keyword search
-npx tweet-search query "typescript" --type keyword --limit 5
+npm run cli query "typescript" --type keyword --limit 5
 ```
 
 ### Query Options
@@ -164,9 +181,11 @@ The tool expects tweets in the following JSON format:
 ### Scripts
 
 - `npm run build` - Build the TypeScript project
-- `npm run dev` - Run in development mode with hot reload
+- `npm run watch` - Watch mode: automatically rebuild on changes
 - `npm run clean` - Clean the build directory
-- `npm start` - Run the built CLI
+- `npm run cli` - Run CLI commands directly from TypeScript source
+- `npm run link` - Install the CLI globally
+- `npm run unlink` - Remove global CLI installation
 
 ### Project Structure
 
