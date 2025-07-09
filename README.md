@@ -86,7 +86,14 @@ npm start <command> [options]
 #### Ingest Tweets
 
 ```bash
+# Full ingestion
 npx tweet-search ingest tweets.json
+
+# Test with limited number of tweets
+npx tweet-search ingest tweets.json --limit 10
+
+# Test with dry run and limited tweets
+npx tweet-search ingest tweets.json --limit 5 --dry-run --skip-embeddings
 ```
 
 #### Interactive Search
@@ -116,6 +123,13 @@ npx tweet-search query "typescript" --type keyword --limit 5
 - `--before`: Filter tweets before this date (ISO format)
 - `--min-favorites`: Minimum favorite count
 - `--min-retweets`: Minimum retweet count
+
+### Ingest Options
+
+- `-b, --batch-size <size>`: Batch size for processing - default: 100
+- `-l, --limit <count>`: Limit number of tweets to process (for testing)
+- `--dry-run`: Process tweets but don't store in turbopuffer
+- `--skip-embeddings`: Skip embedding generation (for testing)
 
 ## Tweet JSON Format
 
