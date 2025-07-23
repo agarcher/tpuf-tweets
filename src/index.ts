@@ -5,6 +5,7 @@ import { config } from "dotenv";
 import { ingestCommand } from "./commands/ingest.js";
 import { searchCommand } from "./commands/search.js";
 import { queryCommand } from "./commands/query.js";
+import { ingestPdfsCommand } from "./commands/ingest-pdfs.js";
 
 // Load environment variables
 config();
@@ -20,6 +21,7 @@ program
 program.addCommand(ingestCommand);
 program.addCommand(searchCommand);
 program.addCommand(queryCommand);
+program.addCommand(ingestPdfsCommand);
 
 // Parse arguments
 program.parse(process.argv);

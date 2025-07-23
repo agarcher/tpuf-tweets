@@ -26,17 +26,23 @@
   "author": "Adam Archer",
   "license": "MIT",
   "dependencies": {
+    "@langchain/community": "^0.3.49",
     "@turbopuffer/turbopuffer": "latest",
-    "openai": "latest",
+    "@types/pdf-parse": "^1.1.5",
+    "@types/uuid": "^10.0.0",
+    "chalk": "latest",
     "commander": "latest",
     "dotenv": "latest",
-    "chalk": "latest",
-    "ora": "latest"
+    "langchain": "^0.3.30",
+    "openai": "latest",
+    "ora": "latest",
+    "pdf-parse": "^1.1.1",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@types/node": "latest",
-    "typescript": "latest",
-    "tsx": "latest"
+    "tsx": "latest",
+    "typescript": "latest"
   },
   "engines": {
     "node": ">=16.0.0"
