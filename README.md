@@ -193,13 +193,16 @@ npm run cli query-pdfs character "your search query" --type hybrid
 
 # Hybrid search with Cohere reranking
 npm run cli query-pdfs character "your search query" --type hybrid --rerank cohere
+
+# Hybrid search with Voyage reranking
+npm run cli query-pdfs character "your search query" --type hybrid --rerank voyage
 ```
 
 ### Options
 
 - `--type, -t <type>`: Search type - `semantic`, `keyword`, or `hybrid` (default: `semantic`)
 - `--limit, -l <limit>`: Maximum number of results (default: `10`)
-- `--rerank, -r <method>`: Reranking method for hybrid search - `rrf` or `cohere` (default: `rrf`)
+- `--rerank, -r <method>`: Reranking method for hybrid search - `rrf`, `cohere`, or `voyage` (default: `rrf`)
 
 ### Cohere Reranking
 
@@ -223,6 +226,25 @@ To use Cohere reranking, you need to:
    ```
 
 If the Cohere API key is not set or the package is not installed, the command will gracefully fall back to using RRF (Reciprocal Rank Fusion).
+
+### Voyage Reranking
+
+To use Voyage reranking, you need to:
+
+1. The Voyage package is already installed (`voyageai`)
+
+2. Set your Voyage API key:
+
+   ```bash
+   export VOYAGE_API_KEY=your_voyage_api_key_here
+   ```
+
+3. Use the `--rerank voyage` option with hybrid search:
+   ```bash
+   npm run cli query-pdfs character "your search query" --type hybrid --rerank voyage
+   ```
+
+If the Voyage API key is not set, the command will gracefully fall back to using RRF (Reciprocal Rank Fusion).
 
 ## Tweet JSON Format
 

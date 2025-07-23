@@ -20,7 +20,7 @@ export const queryPdfsCommand = new Command()
   .option("-l, --limit <limit>", "Maximum number of results", "10")
   .option(
     "-r, --rerank <method>",
-    "Reranking method for hybrid search (rrf, cohere)",
+    "Reranking method for hybrid search (rrf, cohere, voyage)",
     "rrf"
   )
   .action(
@@ -30,7 +30,7 @@ export const queryPdfsCommand = new Command()
       options: {
         type: "semantic" | "keyword" | "hybrid";
         limit: string;
-        rerank: "rrf" | "cohere";
+        rerank: "rrf" | "cohere" | "voyage";
       }
     ) => {
       try {
@@ -178,6 +178,36 @@ export const queryPdfsCommand = new Command()
               }
               return reranked;
             });
+          } else if (rerankMethod === "voyage") {
+            console.log(chalk.gray("Applying Voyage reranking..."));
+
+            // First apply RRF to get candidate set
+            const candidates = reciprocalRankFusion(
+              [vectorResults, ftsResults],
+              60
+            );
+
+            // Then rerank with Voyage
+            const rerankedResults = await voyageRerankOrUnranked(
+              candidates,
+              query,
+              limit
+            );
+
+            // Convert Voyage results back to full result objects
+            results = rerankedResults.map((reranked: any) => {
+              const originalResult = candidates.find(
+                (c: any) => c.id === reranked.id
+              );
+              if (originalResult) {
+                return {
+                  ...originalResult,
+                  $dist: reranked.score, // Use Voyage relevance score
+                  relevanceScore: reranked.score,
+                };
+              }
+              return reranked;
+            });
           } else {
             // Use RRF (default)
             console.log(chalk.gray("Applying Reciprocal Rank Fusion..."));
@@ -234,6 +264,8 @@ export const queryPdfsCommand = new Command()
             const score = result.$dist || result.dist || 0;
             if (rerankMethod === "cohere") {
               scoreDisplay = `Cohere Score: ${score.toFixed(4)}`;
+            } else if (rerankMethod === "voyage") {
+              scoreDisplay = `Voyage Score: ${score.toFixed(4)}`;
             } else {
               scoreDisplay = `RRF Score: ${score.toFixed(4)}`;
             }
@@ -350,6 +382,69 @@ async function cohereRerankOrUnranked(
     console.warn(
       chalk.yellow(
         `⚠️  Warning: Failed to use Cohere reranking (${
+          e instanceof Error ? e.message : "Unknown error"
+        }), falling back to RRF`
+      )
+    );
+    return rows;
+  }
+}
+
+// Voyage AI reranking implementation based on the Voyage AI TypeScript SDK
+async function voyageRerankOrUnranked(
+  rows: any[],
+  query: string,
+  k?: number
+): Promise<any[]> {
+  if (!process.env.VOYAGE_API_KEY) {
+    console.warn(
+      chalk.yellow("⚠️  Warning: VOYAGE_API_KEY not set, falling back to RRF")
+    );
+    return rows;
+  }
+
+  try {
+    const { VoyageAIClient } = await import("voyageai");
+    const client = new VoyageAIClient({ apiKey: process.env.VOYAGE_API_KEY });
+
+    // Prepare documents for Voyage reranking
+    const docs = rows.map((r: any) => {
+      // Get text from various possible locations
+      const text = r.text || r.attributes?.text || "";
+      const title = r.title || r.attributes?.title || "";
+      const author = r.author || r.attributes?.author || "";
+
+      // Combine available text fields for better reranking
+      const combinedText = [title, author, text].filter(Boolean).join(" ");
+
+      return combinedText || "No content available";
+    });
+
+    console.log(
+      chalk.gray(`Reranking ${docs.length} documents with Voyage...`)
+    );
+
+    const reranked = await client.rerank({
+      query: query,
+      documents: docs,
+      model: "rerank-2-lite",
+      topK: k || docs.length,
+      returnDocuments: false,
+      truncation: true,
+    });
+
+    // Handle response structure defensively
+    const results = (reranked as any).results || (reranked as any).data || [];
+    console.log(results);
+    return results.map((r: any) => ({
+      id: rows[r.index].id,
+      score: r.relevanceScore || r.score,
+      originalResult: rows[r.index], // Keep reference to original result
+    }));
+  } catch (e) {
+    console.warn(
+      chalk.yellow(
+        `⚠️  Warning: Failed to use Voyage reranking (${
           e instanceof Error ? e.message : "Unknown error"
         }), falling back to RRF`
       )
