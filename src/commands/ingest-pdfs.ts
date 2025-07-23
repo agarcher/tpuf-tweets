@@ -145,22 +145,6 @@ export const ingestPdfsCommand = new Command()
         );
         console.log("✔ Embeddings created successfully");
 
-        const tpuf = new Turbopuffer({
-          apiKey: process.env.TURBOPUFFER_API_KEY,
-          region: process.env.TURBOPUFFER_REGION,
-        });
-        const ns = tpuf.namespace(namespaceName);
-
-        const spinner = ora(
-          `Deleting all documents from namespace: ${namespaceName}...`
-        ).start();
-        try {
-          await ns.deleteAll();
-          spinner.succeed("Namespace deleted successfully");
-        } catch (error) {
-          spinner.succeed("Namespace does not exist yet");
-        }
-
         const validRows: {
           id: string;
           vector: number[];
@@ -181,14 +165,23 @@ export const ingestPdfsCommand = new Command()
           }
         }
 
-        console.log(`Found ${validRows.length} valid rows`);
-        const { vector, ...rowWithoutVector } = validRows[0]!;
-        console.log(rowWithoutVector);
-
-        console.log("\nFirst document metadata:");
-        console.log(JSON.stringify(splitDocs[0]?.metadata, null, 2));
-
         // Ingest to Turbopuffer
+        const tpuf = new Turbopuffer({
+          apiKey: process.env.TURBOPUFFER_API_KEY,
+          region: process.env.TURBOPUFFER_REGION,
+        });
+        const ns = tpuf.namespace(namespaceName);
+
+        const spinner = ora(
+          `Deleting all documents from namespace: ${namespaceName}...`
+        ).start();
+        try {
+          await ns.deleteAll();
+          spinner.succeed("Namespace deleted successfully");
+        } catch (error) {
+          spinner.succeed("Namespace does not exist yet");
+        }
+
         const ingestSpinner = ora(
           `Ingesting embeddings into Turbopuffer namespace: ${namespaceName}...`
         ).start();

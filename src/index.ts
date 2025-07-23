@@ -6,6 +6,7 @@ import { ingestCommand } from "./commands/ingest.js";
 import { searchCommand } from "./commands/search.js";
 import { queryCommand } from "./commands/query.js";
 import { ingestPdfsCommand } from "./commands/ingest-pdfs.js";
+import { queryPdfsCommand } from "./commands/query-pdfs.js";
 
 // Load environment variables
 config();
@@ -22,6 +23,7 @@ program.addCommand(ingestCommand);
 program.addCommand(searchCommand);
 program.addCommand(queryCommand);
 program.addCommand(ingestPdfsCommand);
+program.addCommand(queryPdfsCommand);
 
 // Parse arguments
 program.parse(process.argv);
