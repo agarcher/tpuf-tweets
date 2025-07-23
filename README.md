@@ -175,6 +175,55 @@ npm run cli -- query "typescript" --type keyword --limit 5
 - `--dry-run`: Process tweets but don't store in turbopuffer
 - `--skip-embeddings`: Skip embedding generation (for testing)
 
+## Querying PDF Documents
+
+The `query-pdfs` command supports different search types and reranking methods:
+
+### Basic Usage
+
+```bash
+# Semantic search
+npm run cli query-pdfs character "your search query"
+
+# Keyword search
+npm run cli query-pdfs character "your search query" --type keyword
+
+# Hybrid search with RRF (default)
+npm run cli query-pdfs character "your search query" --type hybrid
+
+# Hybrid search with Cohere reranking
+npm run cli query-pdfs character "your search query" --type hybrid --rerank cohere
+```
+
+### Options
+
+- `--type, -t <type>`: Search type - `semantic`, `keyword`, or `hybrid` (default: `semantic`)
+- `--limit, -l <limit>`: Maximum number of results (default: `10`)
+- `--rerank, -r <method>`: Reranking method for hybrid search - `rrf` or `cohere` (default: `rrf`)
+
+### Cohere Reranking
+
+To use Cohere reranking, you need to:
+
+1. Install the Cohere package:
+
+   ```bash
+   npm install cohere-ai
+   ```
+
+2. Set your Cohere API key:
+
+   ```bash
+   export COHERE_API_KEY=your_cohere_api_key_here
+   ```
+
+3. Use the `--rerank cohere` option with hybrid search:
+   ```bash
+   npm run cli query-pdfs character "your search query" --type hybrid --rerank cohere
+   ```
+
+If the Cohere API key is not set or the package is not installed, the command will gracefully fall back to using RRF (Reciprocal Rank Fusion).
+
 ## Tweet JSON Format
 
 The tool expects tweets in the following JSON format:

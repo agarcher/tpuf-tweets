@@ -196,8 +196,8 @@ Extensible Approach to Be...
 */
 ```
 
-In theory, the structure based approach should yield better results as it maintains semantic context. In practice, its ability to preserve semantic structure is negated by the noise introduced in PDF text extraction. This is clear from the lack of sentence structure in the first 100 characters printed from both result sets. Both chunking approaches perform similarly poorly, with a negligible difference in the top result's distance (`0.4218` vs `0.4230`), and for other queries it sometimes performed worse.
+In theory, the structure based approach should yield better results as it attempts to maintain semantic context. In practice, its ability to do this is negated by the noise introduced in PDF text extraction. This is clear from the lack of sentence structure in the result text. Both chunking approaches perform similarly poorly, with a negligible difference in the top result's distance (`0.4218` vs `0.4230`).
 
-To improve the results here, we add preprocessing to eliminate noise from the PDF extraction process. Smaller chunk sizes may also help to produce focus the results more narrowly on the valuable portions of the text.
+To improve the results here, we could try preprocessing to eliminate noise from the PDF extraction process. Smaller chunk sizes may also help to produce focus the results more narrowly on the valuable portions of the text.
 
-In reality, all chunking strategies shown are quite primitive strategies and to improve results you will likely want to reach for more advanced techniques like tuning chunking based on your specific document structure or using a [semantic meaning based](https://js.langchain.com/docs/concepts/text_splitters/#semantic-meaning-based) approach.
+In reality, all chunking strategies shown are quite primitive and to improve results you will likely want to reach for more advanced techniques like tuning chunking based on your specific document structure or using a [semantic meaning based](https://js.langchain.com/docs/concepts/text_splitters/#semantic-meaning-based) approach.

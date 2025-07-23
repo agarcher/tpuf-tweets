@@ -31,13 +31,15 @@
     "@types/pdf-parse": "^1.1.5",
     "@types/uuid": "^10.0.0",
     "chalk": "latest",
+    "cohere-ai": "^7.18.0",
     "commander": "latest",
     "dotenv": "latest",
     "langchain": "^0.3.30",
     "openai": "latest",
     "ora": "latest",
     "pdf-parse": "^1.1.1",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "voyageai": "^0.0.4"
   },
   "devDependencies": {
     "@types/node": "latest",
