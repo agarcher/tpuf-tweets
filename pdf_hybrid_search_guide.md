@@ -112,7 +112,7 @@ We created three namespaces in turbopuffer each with the documents chunked with 
 
 Character and token based chunking strategies with fixed limits perform similarly. One advantage of token based chunking is that the results will yield a consistent token count which is useful in building context for large language model queries.
 
-Let's try some searches against the `chunk-character` and `chunk-token` namespaces and see how they perform.
+Let's try some searches against the `chunk-structure` and `chunk-token` namespaces and see how they perform.
 
 ```typescript
 // Query token-based chunking approach
