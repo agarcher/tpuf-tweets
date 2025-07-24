@@ -38,7 +38,6 @@ const directoryLoader = new DirectoryLoader("./data", {
   ".pdf": (path: string) => new PDFLoader(path, { splitPages: false }),
 });
 const docs = await directoryLoader.load();
-console.log(`Loaded ${docs.length} PDF documents`);
 
 // Chunk documents using fixed length character blocks
 import { CharacterTextSplitter } from "langchain/text_splitter";
@@ -117,8 +116,7 @@ Let's try some searches against the `chunk-character` and `chunk-token` namespac
 
 ```typescript
 // Query token-based chunking approach
-const query =
-  "effective strategies for benchmarking llm generated code quality";
+const query = "effective strategies for benchmarking llm generated code quality";
 const queryEmbedding = await openai.embeddings.create({
   model: "text-embedding-3-small",
   input: [query],
@@ -131,12 +129,11 @@ const tokenResults = await tokenNs.query({
   include_attributes: ["text", "title"],
 });
 
+// Log results
 tokenResults.forEach((result, i) => {
   const truncatedText = `${result.text.substring(0, 100)}...`;
   const dist = result.$dist.toFixed(4);
-  console.log(
-    `[${i + 1}] Distance: ${dist}\n📄 ${result.title}\n${truncatedText}`
-  );
+  console.log(`[${i + 1}] Distance: ${dist}\n📄 ${result.title}\n${truncatedText}\n`);
 });
 
 /* Token-based results:
@@ -186,22 +183,21 @@ Extensible Approach to Be...
 */
 ```
 
-In theory, the structure based approach should yield better results as it attempts to maintain semantic context. In practice, its ability to do this is negated by the noise introduced in PDF text extraction. This is clear from the lack of sentence structure in the result text. Both chunking approaches perform similarly poorly, with a negligible difference in the top result's distance (`0.4218` vs `0.4230`).
+In theory, the structure based approach should yield better results as it attempts to maintain semantic context. In practice, its ability to do this is negated by the noise introduced in PDF text extraction. This is clear from the lack of sentence structure in the result text. Both chunking approaches perform similarly poorly, with a negligible difference in the top result (distance `0.4218` vs `0.4230`).
 
 To improve the results here, we could preprocessing the PDF to eliminate noise. Smaller chunk sizes may also help to produce focus the results more narrowly on the valuable portions of the text.
 
-In reality, all chunking strategies shown are primitive and you will likely want to reach for more advanced techniques like tuning chunking to your specific document structure or using a [semantic meaning based](https://js.langchain.com/docs/concepts/text_splitters/#semantic-meaning-based) approach.
+In reality, all chunking strategies we explored are primitive and we suggest you reach for more advanced techniques like tuning chunking directly to your specific document structure or using a [semantic meaning based](https://js.langchain.com/docs/concepts/text_splitters/#semantic-meaning-based) approach.
 
 ## Hybrid Search Retrieval
 
-While individual vector or BM25 searches can be effective, combining them through hybrid search often yields superior results by leveraging both semantic understanding and keyword matching. Turbopuffer's `multiQuery` allows us to execute both search types simultaneously.
+While individual vector or BM25 searches can be effective, combining them through hybrid search often yields superior results by leveraging both semantic understanding and keyword matching. turbopuffer's `multiQuery` allows us to execute both search types simultaneously.
 
 We'll explore how to implement hybrid search and fuse results using a couple different algorithms (RRF and DBSF), and then enhance the results using external reranking services like [Cohere](https://cohere.com/rerank) or [Voyage](https://docs.voyageai.com/docs/reranker).
 
 ```typescript
 // Hybrid search with simultaneous vector and BM25 queries
-const query =
-  "effective strategies for benchmarking llm generated code quality";
+const query = "effective strategies for benchmarking llm generated code quality";
 const queryEmbedding = await openai.embeddings.create({
   model: "text-embedding-3-small",
   input: [query],
@@ -226,7 +222,7 @@ const multiQueryResult = await ns.multiQuery({
 const vectorResults = multiQueryResult.results[0]?.rows ?? [];
 const ftsResults = multiQueryResult.results[1]?.rows ?? [];
 
-// Merge results with Reciprocal Rank Fusion (RRF)
+// Fuse results with Reciprocal Rank Fusion (RRF)
 function reciprocalRankFusion(resultLists: any[], k: number = 60): any[] {
   const scores: { [key: string]: number } = {};
   const allResults: { [key: string]: any } = {};
@@ -251,12 +247,10 @@ function reciprocalRankFusion(resultLists: any[], k: number = 60): any[] {
 }
 const rrfResults = reciprocalRankFusion([vectorResults, ftsResults]);
 
-// Print top 5 results
+// Log top 5 results
 rrfResults.slice(0, 5).forEach((result, i) => {
   const score = result.rrfScore.toFixed(4);
-  console.log(
-    `[${i + 1}] RRF Score: ${score}\n📄 ${result.title}\n🔍 ${result.id}\n`
-  );
+  console.log(`[${i + 1}] RRF Score: ${score}\n📄 ${result.title}\n🔍 ${result.id}\n`);
 });
 
 /* RRF Results:
@@ -282,7 +276,7 @@ rrfResults.slice(0, 5).forEach((result, i) => {
 */
 ```
 
-These results are okay. They are about benchmarking LLMs, but the results focus on language and legal documents, not code. We can improve on these results without reaching for robust reranking models (yet) by simply pulling more results.
+These results are okay. They are about benchmarking LLMs, but the results focus on language and legal documents, not code. We can improve on this without reaching for robust reranking models (yet) by simply pulling more results.
 
 ```typescript
 // Execute both searches with top_k at 25 (up from 10)
@@ -301,7 +295,7 @@ const multiQueryResult = await ns.multiQuery({
     },
   ],
 });
-// ... merge results with RRF and log like before
+// ... fuse results with RRF and log like before
 
 /* RRF Results:
 [1] RRF Score: 0.0307
@@ -330,7 +324,7 @@ With this approach, results 2 and 3 seem like more direct hits for our query. By
 
 ```typescript
 // ... hybrid search with top_k 25 like before
-// Merge results with Distribution-Based Score Fusion (DBSF)
+// Fuse results with Distribution-Based Score Fusion (DBSF)
 function distributionBasedScoreFusion(resultLists: any[]): any[] {
   const scores: { [key: string]: number } = {};
   const allResults: { [key: string]: any } = {};
@@ -341,17 +335,11 @@ function distributionBasedScoreFusion(resultLists: any[]): any[] {
 
     // Calculate mean (μ) and standard deviation (σ) for result set
     const queryScores = results.map((result: any) => result.$dist);
-    const mean =
-      queryScores.reduce((sum: number, score: number) => sum + score, 0) /
-      queryScores.length;
-    const variance =
-      queryScores.reduce(
-        (sum: number, score: number) => sum + Math.pow(score - mean, 2),
-        0
-      ) / queryScores.length;
+    const mean = queryScores.reduce((sum: number, score: number) => sum + score, 0) / queryScores.length;
+    const variance = queryScores.reduce((sum: number, score: number) => sum + Math.pow(score - mean, 2), 0) / queryScores.length;
     const stdDev = Math.sqrt(variance);
 
-    // Set limits: L = μ - 3σ, U = μ + 3σ
+    // Compute limits: L = μ - 3σ, U = μ + 3σ
     const lowerLimit = mean - 3 * stdDev;
     const upperLimit = mean + 3 * stdDev;
     const denominator = upperLimit - lowerLimit;
@@ -377,12 +365,12 @@ function distributionBasedScoreFusion(resultLists: any[]): any[] {
     }
   }
 
-  // Sort by combined normalized scores (higher is better)
+  // Sort by combined normalized scores
   return Object.entries(scores)
     .sort(([, a], [, b]) => b - a)
     .map(([docId, score]) => {
       const result = allResults[docId];
-      result.$dist = score; // Store DBSF score as distance for consistency
+      result.dbsfScore = score;
       return result;
     });
 }
@@ -416,7 +404,7 @@ Looking at the results we can see that RRF and DBSF performed similarly. They in
 Each algorithm offers distinct advantages:
 
 - RRF excels in its simplicity and robustness, being rank-based rather than score-dependent, making it effective when score distributions are unreliable or inconsistent.
-- DBSF, leverages the actual score distributions through statistical normalization, potentially capturing more nuanced signal when scores are well-calibrated.
+- DBSF leverages the actual score distributions through statistical normalization, potentially capturing more nuanced signal when scores are well-calibrated.
 
 The choice between these fusion methods depends on your specific problem domain, the characteristics of your search systems, and the nature of your dataset. RRF tends to be a safer default choice for mixed or unknown score quality, while DBSF may provide better results when you have confidence in your scoring systems and need to capture subtle relevance distinctions. To learn more about these algorithms check out [Understanding The Math Behind RRF and DBSF with Examples](https://dev.to/irajjelodari/understanding-math-behind-rrf-and-dbsf-with-examples-4bec).
 
@@ -439,7 +427,6 @@ const cohereResults = reranked.results.map((r: any) => ({
   ...rrfResults[r.index],
   cohereScore: r.relevanceScore,
 }));
-// ... log results similar to above
 
 /* Cohere Results:
 [1] Cohere Score: 0.9798
@@ -476,9 +463,8 @@ const reranked = await client.rerank({
 
 const voyageResults = reranked.data.map((r: any) => ({
   ...rrfResults[r.index],
-  voyageScore: r.relevanceScore || r.score,
+  voyageScore: r.relevanceScore,
 }));
-// ... log results similar to above
 
 /* Voyage Results:
 [1] Voyage Score: 0.6172
@@ -503,13 +489,13 @@ const voyageResults = reranked.data.map((r: any) => ({
 */
 ```
 
-Both Cohere and Voyage performed well: Cohere placed two highly relevant SwiftEval chunks at the top positions, while Voyage identified 4 out of 5 results from the highly relevant SwiftEval paper. The neural rerankers elevated the more relevant code evaluation content above the legal benchmarking results that RRF alone ranked higher.
+Both Cohere and Voyage performed well: Cohere placed two relevant SwiftEval chunks at the top positions, while Voyage identified 4 out of 5 results from the SwiftEval paper. The neural rerankers elevated the code evaluation content above the legal benchmarking results that RRF alone ranked higher.
 
-Local algorithms like RRF or DBSF provide speed and simplicity with no external dependencies or costs, while neural reranking offers improved accuracy at the expense of additional complexity and API costs. For optimal results, consider a cascade approach like we did here: use RRF to quickly filter candidates, then apply neural reranking to refine the most promising results.
+Local algorithms like RRF or DBSF provide speed and simplicity with no external dependencies or costs, while neural reranking offers improved accuracy at the expense of additional complexity and API costs. For optimal results, we suggest a cascade approach like we user here: use algorithmic approaches to quickly filter candidates, then apply neural reranking to refine the most promising results.
 
 ## Evaluation Methodologies
 
-So far we have manually inspected search results to assess quality. While this qualitative assessment provides some insights, manual evaluation faces key limitations: subjectivity in "good" results, impracticality at scale, and difficulty quantifying improvements. For robust evalution, we need automated methods that can objectively compare measure quality of search results as various parts of the system are changed.
+So far we have manually inspected search results to assess quality. While this qualitative assessment provides some insights, manual evaluation faces key limitations: subjectivity in "good" results, impracticality at scale, and difficulty quantifying improvements. For robust evalution, we need automated methods that can objectively compare quality of search results as various parts of the system are changed.
 
 Effective evaluation starts with creating a dataset of queries with known relevant documents. Some possible approaches to this include:
 
