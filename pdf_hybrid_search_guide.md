@@ -22,7 +22,7 @@
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-This expands on our [Hybrid Search guide](https://turbopuffer.com/docs/hybrid) and explores techniques for improving search accuracy with large datasets of unstructured documents. We'll compare different chunking strategies and evaluate their impact on search quality using turbopuffer's vector and BM25 full-text search capabilities, then explore multiple rank fusion approaches and evaluation methodologies.
+This expands on our [Hybrid Search guide](https://turbopuffer.com/docs/hybrid) and explores techniques for improving search accuracy with large datasets of unstructured documents. We'll compare different chunking strategies and evaluate their impact on search quality using turbopuffer's vector and BM25 full-text search capabilities, then explore multiple rank fusion, reranking approaches, and evaluation methodologies.
 
 We will use [this collection](https://example.com/link/to/zip) of PDF papers on large language models from https://arxiv.org/ for the purposes of this guide.
 
