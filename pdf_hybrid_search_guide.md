@@ -66,7 +66,6 @@ const validRows = splitDocs.map((doc, i) => ({
   vector: embeddings[i],
   text: doc.pageContent,
   title: doc.metadata.pdf.info.Title,
-  author: doc.metadata.pdf.info.Author,
 }));
 
 // Create turbopuffer client and ingest data
@@ -81,8 +80,6 @@ await ns.write({
   upsert_rows: validRows,
   schema: {
     text: { type: "string", full_text_search: true },
-    title: { type: "string", full_text_search: true },
-    author: { type: "string", full_text_search: true },
   },
   distance_metric: "cosine_distance",
 });
@@ -110,13 +107,13 @@ const tokenSplitter = new TokenTextSplitter({
 
 We created three namespaces in turbopuffer each with the documents chunked with slightly different strategies:
 
-- `chunk-character`: Documents are chunked into fixed length based on character count with a small overlap (5000 character chunks, with 1000 character overlap).
-- `chunk-structure`: Documents are chunked with an attempt to keep semantic structure (e.g. paragraphs, sentences, etc.) intact while respecting fixed length limits where possible (5000 character chunks, with 1000 character overlap).
-- `chunk-token`: Documents are chunked into fixed length based on token count with a small overlap (1000 token chunks, with 200 token overlap).
+- `chunk-character`: Documents are chunked into fixed length based on character count with a small overlap.
+- `chunk-structure`: Documents are chunked with an attempt to keep semantic structure (e.g. paragraphs, sentences, etc.) intact while respecting fixed length limits where possible.
+- `chunk-token`: Documents are chunked into fixed length based on token count with a small overlap.
 
-Character and token based chunking strategies with fixed limits are nearly identical in performance. One advantage of token based chunking is that the results will yield a consistent token count which is useful in building queries for large language model.
+Character and token based chunking strategies with fixed limits perform similarly. One advantage of token based chunking is that the results will yield a consistent token count which is useful in building context for large language model queries.
 
-Let's try some queries against the `chunk-character` and `chunk-token` namespaces and see how they perform.
+Let's try some searches against the `chunk-character` and `chunk-token` namespaces and see how they perform.
 
 ```typescript
 // Query token-based chunking approach
@@ -131,34 +128,32 @@ const tokenNs = tpuf.namespace("chunk-token");
 const tokenResults = await tokenNs.query({
   rank_by: ["vector", "ANN", queryEmbedding.data[0].embedding],
   top_k: 3,
-  include_attributes: ["text", "title", "author"],
+  include_attributes: ["text", "title"],
 });
 
 tokenResults.forEach((result, i) => {
-  console.log(`[${i + 1}] Distance: ${result.$dist.toFixed(4)}`);
-  console.log(`📄 ${result.title}`);
-  console.log(`👤 ${result.author}`);
-  console.log(`${result.text.substring(0, 100)}...`);
+  const truncatedText = `${result.text.substring(0, 100)}...`;
+  const dist = result.$dist.toFixed(4);
+  console.log(
+    `[${i + 1}] Distance: ${dist}\n📄 ${result.title}\n${truncatedText}`
+  );
 });
 
 /* Token-based results:
 [1] Distance: 0.4230
 📄 LegalEval-Q: A New Benchmark for The Quality Evaluation of LLM-Generated Legal Text
-👤 Li yunhan; Wu gengshen
 arXiv:2505.24826v1  [cs.CL]  30 May 2025
 LegalEval-Q: A New Benchmark for The Quality Evaluation of
 ...
 
 [2] Distance: 0.4428
 📄 LegalEval-Q: A New Benchmark for The Quality Evaluation of LLM-Generated Legal Text
-👤 Li yunhan; Wu gengshen
  resultant textual
 quality remains poorly understood. These gaps hin-
 der model selection and optimi...
 
 [3] Distance: 0.4512
 📄 LegalEval-Q: A New Benchmark for The Quality Evaluation of LLM-Generated Legal Text
-👤 Li yunhan; Wu gengshen
  natural language generation(NLG) studies
 (Kasai et al., 2021), these metrics exhibit fundamen-
 tal ...
@@ -175,20 +170,17 @@ const structureResults = await structureNs.query({
 /* Structure-based results:
 [1] Distance: 0.4218
 📄 LegalEval-Q: A New Benchmark for The Quality Evaluation of LLM-Generated Legal Text
-👤 Li yunhan; Wu gengshen
 arXiv:2505.24826v1  [cs.CL]  30 May 2025
 LegalEval-Q: A New Benchmark for The Quality Evaluation of
 ...
 
 [2] Distance: 0.4792
 📄 SwiftEval: Developing a Language-Specific Benchmark for LLM-generated Code Evaluation
-👤 Ivan Petrukha; Yana Kurliak; Nataliia Stulova
 arXiv:2505.24324v1  [cs.LG]  30 May 2025
 © Ivan Petrukha, Yana Kurliak, Nataliia Stulova, accepted f...
 
 [3] Distance: 0.4796
 📄 SwiftEval: Developing a Language-Specific Benchmark for LLM-generated Code Evaluation
-👤 Ivan Petrukha; Yana Kurliak; Nataliia Stulova
 A.  Guha,  M.  Greenberg,  and  A.  Jangda,  “MultiPL-E:  A  Scalable  and
 Extensible Approach to Be...
 */
@@ -198,13 +190,13 @@ In theory, the structure based approach should yield better results as it attemp
 
 To improve the results here, we could preprocessing the PDF to eliminate noise. Smaller chunk sizes may also help to produce focus the results more narrowly on the valuable portions of the text.
 
-In reality, all chunking strategies shown are quite primitive and to improve results you will likely want to reach for more advanced techniques like tuning chunking based on your specific document structure or using a [semantic meaning based](https://js.langchain.com/docs/concepts/text_splitters/#semantic-meaning-based) approach.
+In reality, all chunking strategies shown are primitive and you will likely want to reach for more advanced techniques like tuning chunking to your specific document structure or using a [semantic meaning based](https://js.langchain.com/docs/concepts/text_splitters/#semantic-meaning-based) approach.
 
 ## Hybrid Search Retrieval
 
 While individual vector or BM25 searches can be effective, combining them through hybrid search often yields superior results by leveraging both semantic understanding and keyword matching. Turbopuffer's `multiQuery` allows us to execute both search types simultaneously.
 
-We'll explore how to implement hybrid search and fuse results using a couple different algorithms, and then enhance the results using external reranking services like [Cohere](https://cohere.com/rerank) or [Voyage](https://docs.voyageai.com/docs/reranker).
+We'll explore how to implement hybrid search and fuse results using a couple different algorithms (RRF and DBSF), and then enhance the results using external reranking services like [Cohere](https://cohere.com/rerank) or [Voyage](https://docs.voyageai.com/docs/reranker).
 
 ```typescript
 // Hybrid search with simultaneous vector and BM25 queries
@@ -231,7 +223,6 @@ const multiQueryResult = await ns.multiQuery({
     },
   ],
 });
-
 const vectorResults = multiQueryResult.results[0]?.rows ?? [];
 const ftsResults = multiQueryResult.results[1]?.rows ?? [];
 
@@ -262,10 +253,9 @@ const rrfResults = reciprocalRankFusion([vectorResults, ftsResults]);
 
 // Print top 5 results
 rrfResults.slice(0, 5).forEach((result, i) => {
+  const score = result.rrfScore.toFixed(4);
   console.log(
-    `[${i + 1}] RRF Score: ${result.rrfScore.toFixed(4)}\n📄 ${
-      result.title
-    }\n🔍 ${result.id}\n`
+    `[${i + 1}] RRF Score: ${score}\n📄 ${result.title}\n🔍 ${result.id}\n`
   );
 });
 
@@ -292,7 +282,7 @@ rrfResults.slice(0, 5).forEach((result, i) => {
 */
 ```
 
-These results are okay. They are about benchmarking LLMs, but the results focus on language and legal documents, not code. We can improve on these results without reaching for robust reranking models (yet) by simply pulling more results!
+These results are okay. They are about benchmarking LLMs, but the results focus on language and legal documents, not code. We can improve on these results without reaching for robust reranking models (yet) by simply pulling more results.
 
 ```typescript
 // Execute both searches with top_k at 25 (up from 10)
@@ -336,7 +326,7 @@ const multiQueryResult = await ns.multiQuery({
 */
 ```
 
-With this approach, results 2 and 3 seem like more direct hits for our query. By including more results in the vector and full text searches, we are now hitting documents that were in both query results, but farther down the list. Before we look at reranking, let's try another algorithm to fuse results.
+With this approach, results 2 and 3 seem like more direct hits for our query. By including more results in the vector and full text searches, we are now hitting documents that were in both result sets, but farther down the list. Before we look at reranking, let's try another algorithm to fuse results.
 
 ```typescript
 // ... hybrid search with top_k 25 like before
@@ -421,7 +411,14 @@ const dbsfResults = distributionBasedScoreFusion([vectorResults, ftsResults]);
 */
 ```
 
-Looking at the results we can see that RRF and DBSF performed similarly. They included the same two chunks from the SwiftEval doc in the top 5 results, though RRF ranked them higher. Each algorithm offers distinct advantages: RRF excels in its simplicity and robustness, being rank-based rather than score-dependent, making it effective when score distributions are unreliable or inconsistent. DBSF, leverages the actual score distributions through statistical normalization, potentially capturing more nuanced signal when scores are well-calibrated. The choice between these fusion methods depends on your specific problem domain, the characteristics of your search systems, and the nature of your dataset. RRF tends to be a safer default choice for mixed or unknown score quality, while DBSF may provide better results when you have confidence in your scoring systems and need to capture subtle relevance distinctions. To learn more about these algorithms check out [Understanding The Math Behind RRF and DBSF with Examples](https://dev.to/irajjelodari/understanding-math-behind-rrf-and-dbsf-with-examples-4bec).
+Looking at the results we can see that RRF and DBSF performed similarly. They included the same two chunks from the SwiftEval doc in the top 5 results, though RRF ranked them higher.
+
+Each algorithm offers distinct advantages:
+
+- RRF excels in its simplicity and robustness, being rank-based rather than score-dependent, making it effective when score distributions are unreliable or inconsistent.
+- DBSF, leverages the actual score distributions through statistical normalization, potentially capturing more nuanced signal when scores are well-calibrated.
+
+The choice between these fusion methods depends on your specific problem domain, the characteristics of your search systems, and the nature of your dataset. RRF tends to be a safer default choice for mixed or unknown score quality, while DBSF may provide better results when you have confidence in your scoring systems and need to capture subtle relevance distinctions. To learn more about these algorithms check out [Understanding The Math Behind RRF and DBSF with Examples](https://dev.to/irajjelodari/understanding-math-behind-rrf-and-dbsf-with-examples-4bec).
 
 While RRF and DBSF alone provide a solid foundation for result fusion, external reranking services can further refine the results using sophisticated neural relevance models.
 
