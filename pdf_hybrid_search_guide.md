@@ -185,7 +185,7 @@ Extensible Approach to Be...
 
 In theory, the structure based approach should yield better results as it attempts to maintain semantic context. In practice, its ability to do this is negated by the noise introduced in PDF text extraction. This is clear from the lack of sentence structure in the result text. Both chunking approaches perform similarly poorly, with a negligible difference in the top result (distance `0.4218` vs `0.4230`).
 
-To improve the results here, we could preprocessing the PDF to eliminate noise. Smaller chunk sizes may also help to produce focus the results more narrowly on the valuable portions of the text.
+To improve the results here, we could preprocessing the PDF to eliminate noise. Smaller chunk sizes may also help to focus the results more narrowly on the valuable portions of the text.
 
 In reality, all chunking strategies we explored are primitive and we suggest you reach for more advanced techniques like tuning chunking directly to your specific document structure or using a [semantic meaning based](https://js.langchain.com/docs/concepts/text_splitters/#semantic-meaning-based) approach.
 
