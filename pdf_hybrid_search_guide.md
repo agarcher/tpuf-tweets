@@ -8,15 +8,14 @@
 └────────────────────────────────────┬────────────────────────────────────────────┘
                                      │
 ┌────────────────────────────────────▼────────────────────────────────────────────┐
-│                        Document Processing Pipeline                             │
+│                           Chunking and Indexing                                 │
 │  ┌─────────────┐  ┌───────────────┐  ┌─────────────┐  ┌─────────────────────┐   │
 │  │ PDF Parsing │─▶│   Chunking    │─▶│ Embeddings  │─▶│   turbopuffer       │   │
-│  │ (LangChain) │  │ (3 Strategies)│  │ (OpenAI)    │  │   (3 Namespaces)    │   │
 │  └─────────────┘  └───────────────┘  └─────────────┘  └─────────────────────┘   │
 └────────────────────────────────────┬────────────────────────────────────────────┘
                                      │
 ┌────────────────────────────────────▼────────────────────────────────────────────┐
-│                           Hybrid Search Evaluation                              │
+│                          Hybrid Search Retrieval                                │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐     │
 │  │   Vector     │  │ BM25 Search  │  │ Rank Fusion  │  │   Evaluation     │     │
 │  │   Search     │  │   (FTS)      │  │ (Multiple)   │  │   (NDCG, etc)    │     │
@@ -52,7 +51,7 @@ const splitDocs = await textSplitter.splitDocuments(docs);
 console.log(`Split ${docs.length} documents into ${splitDocs.length} chunks`);
 // Split 100 documents into 1873 chunks
 
-// Generate embeddings using OpenAI (in reality you'll need to work in batches to avoid timeouts)
+// Generate embeddings using OpenAI (in practice you'll need to work in batches to avoid timeouts)
 import OpenAI from "openai";
 const openai = new OpenAI();
 const response = await openai.embeddings.create({
@@ -138,8 +137,8 @@ const tokenResults = await tokenNs.query({
 
 tokenResults.forEach((result, i) => {
   console.log(`[${i + 1}] Distance: ${result.$dist.toFixed(4)}`);
-  console.log(`📄 ${result.attributes.title}`);
-  console.log(`👤 ${result.attributes.author}\n`);
+  console.log(`📄 ${result.title}`);
+  console.log(`👤 ${result.author}`);
   console.log(`${result.text.substring(0, 100)}...`);
 });
 
@@ -198,6 +197,251 @@ Extensible Approach to Be...
 
 In theory, the structure based approach should yield better results as it attempts to maintain semantic context. In practice, its ability to do this is negated by the noise introduced in PDF text extraction. This is clear from the lack of sentence structure in the result text. Both chunking approaches perform similarly poorly, with a negligible difference in the top result's distance (`0.4218` vs `0.4230`).
 
-To improve the results here, we could try preprocessing to eliminate noise from the PDF extraction process. Smaller chunk sizes may also help to produce focus the results more narrowly on the valuable portions of the text.
+To improve the results here, we could preprocessing the PDF to eliminate noise. Smaller chunk sizes may also help to produce focus the results more narrowly on the valuable portions of the text.
 
 In reality, all chunking strategies shown are quite primitive and to improve results you will likely want to reach for more advanced techniques like tuning chunking based on your specific document structure or using a [semantic meaning based](https://js.langchain.com/docs/concepts/text_splitters/#semantic-meaning-based) approach.
+
+## Hybrid Search Retrieval
+
+While individual vector or BM25 searches can be effective, combining them through hybrid search often yields superior results by leveraging both semantic understanding and keyword matching. Turbopuffer's `multiQuery` allows us to execute both search types simultaneously.
+
+Let's explore how to implement hybrid search using a simple local algorithm, Reciprocal Rank Fusion (RRF), and then enhance the results using external reranking services like [Cohere](https://cohere.com/rerank) and [Voyage](https://docs.voyageai.com/docs/reranker).
+
+```typescript
+// Hybrid search with simultaneous vector and BM25 queries
+const query =
+  "effective strategies for benchmarking llm generated code quality";
+const queryEmbedding = await openai.embeddings.create({
+  model: "text-embedding-3-small",
+  input: [query],
+});
+
+// Execute both searches simultaneously using multiQuery
+const ns = tpuf.namespace("chunk-token");
+const multiQueryResult = await ns.multiQuery({
+  queries: [
+    {
+      rank_by: ["vector", "ANN", queryEmbedding.data[0].embedding],
+      top_k: 10,
+      include_attributes: ["id", "text", "title"],
+    },
+    {
+      rank_by: ["text", "BM25", query],
+      top_k: 10,
+      include_attributes: ["id", "text", "title"],
+    },
+  ],
+});
+
+const vectorResults = multiQueryResult.results[0]?.rows ?? [];
+const ftsResults = multiQueryResult.results[1]?.rows ?? [];
+
+// Merge results with Reciprocal Rank Fusion (RRF)
+function reciprocalRankFusion(resultLists: any[], k: number = 60): any[] {
+  const scores: { [key: string]: number } = {};
+  const allResults: { [key: string]: any } = {};
+
+  for (const results of resultLists) {
+    if (!results) continue;
+    for (let rank = 1; rank <= results.length; rank++) {
+      const item = results[rank - 1];
+      const itemId = item.id;
+      scores[itemId] = (scores[itemId] || 0) + 1.0 / (k + rank);
+      allResults[itemId] = item;
+    }
+  }
+
+  return Object.entries(scores)
+    .sort(([, a], [, b]) => b - a)
+    .map(([docId, score]) => {
+      const result = allResults[docId];
+      result.rrfScore = score;
+      return result;
+    });
+}
+const rrfResults = reciprocalRankFusion([vectorResults, ftsResults]);
+
+// Print top 5 results
+rrfResults.slice(0, 5).forEach((result, i) => {
+  console.log(
+    `[${i + 1}] RRF Score: ${result.rrfScore.toFixed(4)}\n📄 ${
+      result.title
+    }\n🔍 ${result.id}\n`
+  );
+});
+
+/* RRF Results:
+[1] RRF Score: 0.0307
+📄 LegalEval-Q: A New Benchmark for The Quality Evaluation of LLM-Generated Legal Text
+🔍 f8960925-d30e-411b-ab27-86fdf9c182d6
+
+[2] RRF Score: 0.0164
+📄 VietMix: A Naturally Occurring Vietnamese-English Code-Mixed Corpus with Iterative Augmentation for Machine Translation
+🔍 54cf1c73-7909-43ec-b4e1-c70c18c001d9
+
+[3] RRF Score: 0.0161
+📄 LegalEval-Q: A New Benchmark for The Quality Evaluation of LLM-Generated Legal Text
+🔍 e05117e3-daba-4400-a8cd-75dac9e6cf4a
+
+[4] RRF Score: 0.0161
+📄 Bench4KE: Benchmarking Automated Competency Question Generation
+🔍 3ac70531-6dea-46ed-a507-0d83e206985e
+
+[5] RRF Score: 0.0159
+📄 LegalEval-Q: A New Benchmark for The Quality Evaluation of LLM-Generated Legal Text
+🔍 8f2b0dd3-dac1-4905-939c-b80f8c7f37ae
+*/
+```
+
+These results are okay. They are about benchmarking LLMs, but the results focus on language and legal documents, not code. We can improve on these results even without reaching for robust reranking models (yet) by simply pulling more results!
+
+```typescript
+// Execute both searches with top_k at 25 (up from 10)
+const ns = tpuf.namespace("chunk-token");
+const multiQueryResult = await ns.multiQuery({
+  queries: [
+    {
+      rank_by: ["vector", "ANN", queryEmbedding.data[0].embedding],
+      top_k: 25,
+      include_attributes: ["id", "text", "title"],
+    },
+    {
+      rank_by: ["text", "BM25", query],
+      top_k: 25,
+      include_attributes: ["id", "text", "title"],
+    },
+  ],
+});
+// ... merge results with RRF and log like before
+
+/* RRF Results:
+[1] RRF Score: 0.0307
+📄 LegalEval-Q: A New Benchmark for The Quality Evaluation of LLM-Generated Legal Text
+🔍 f8960925-d30e-411b-ab27-86fdf9c182d6
+
+[2] RRF Score: 0.0284
+📄 SwiftEval: Developing a Language-Specific Benchmark for LLM-generated Code Evaluation
+🔍 3513ea1d-28f9-42fd-89f8-9a862d1ccfd2
+
+[3] RRF Score: 0.0276
+📄 SwiftEval: Developing a Language-Specific Benchmark for LLM-generated Code Evaluation
+🔍 06997b72-b270-4de6-98b4-19a501283a21
+
+[4] RRF Score: 0.0243
+📄 Bench4KE: Benchmarking Automated Competency Question Generation
+🔍 71cf486c-d875-49a4-a6c4-c3805c9e450a
+
+[5] RRF Score: 0.0164
+📄 VietMix: A Naturally Occurring Vietnamese-English Code-Mixed Corpus with Iterative Augmentation for Machine Translation
+🔍 54cf1c73-7909-43ec-b4e1-c70c18c001d9
+*/
+```
+
+With this approach, results 2 and 3 seem like more direct hits for our query. By including more results in the vector and full text searches, we are now hitting documents that were in both query results, but farther down in one.
+
+While RRF provides a solid foundation for result fusion, external reranking services can further refine the results using more sophisticated relevance models.
+
+The examples that follow build on our `rrfResults` set generated with `top_k` set to `25` for both queries.
+
+```typescript
+// Cohere Reranking using rerank-english-v3.0 model
+import { CohereClient } from "cohere-ai";
+const co = new CohereClient({ token: process.env.COHERE_API_KEY });
+const reranked = await co.rerank({
+  query: query,
+  documents: rrfResults.map((result) => result.text);,
+  topN: 5,
+  model: "rerank-english-v3.0",
+});
+
+const cohereResults = reranked.results.map((r: any) => ({
+  ...rrfResults[r.index],
+  cohereScore: r.relevanceScore,
+}));
+// ... log results similar to above
+
+/* Cohere Results:
+[1] Cohere Score: 0.9798
+📄 SwiftEval: Developing a Language-Specific Benchmark for LLM-generated Code Evaluation
+🔍 3513ea1d-28f9-42fd-89f8-9a862d1ccfd2
+
+[2] Cohere Score: 0.9693
+📄 SwiftEval: Developing a Language-Specific Benchmark for LLM-generated Code Evaluation
+🔍 06997b72-b270-4de6-98b4-19a501283a21
+
+[3] Cohere Score: 0.9613
+📄 LegalEval-Q: A New Benchmark for The Quality Evaluation of LLM-Generated Legal Text
+🔍 f8960925-d30e-411b-ab27-86fdf9c182d6
+
+[4] Cohere Score: 0.9132
+📄 AlphaOne: Reasoning Models Thinking Slow and Fast at Test Time
+🔍 249d5c23-a792-43aa-a358-3305a70bafa3
+
+[5] Cohere Score: 0.9031
+📄 Bench4KE: Benchmarking Automated Competency Question Generation
+🔍 71cf486c-d875-49a4-a6c4-c3805c9e450a
+*/
+
+// Voyage AI Reranking using rerank-2-lite model
+import { VoyageAIClient } from "voyageai";
+const client = new VoyageAIClient({ apiKey: process.env.VOYAGE_API_KEY });
+const reranked = await client.rerank({
+  query: query,
+  documents: rrfResults.map((result) => result.text),
+  model: "rerank-2-lite",
+  topK: 5,
+  returnDocuments: false,
+});
+
+const voyageResults = reranked.data.map((r: any) => ({
+  ...rrfResults[r.index],
+  voyageScore: r.relevanceScore || r.score,
+}));
+// ... log results similar to above
+
+/* Voyage Results:
+[1] Voyage Score: 0.6172
+📄 SwiftEval: Developing a Language-Specific Benchmark for LLM-generated Code Evaluation
+🔍 8b7e76fc-7915-4c43-87bd-a43c2743ac7b
+
+[2] Voyage Score: 0.6133
+📄 LegalEval-Q: A New Benchmark for The Quality Evaluation of LLM-Generated Legal Text
+🔍 f8960925-d30e-411b-ab27-86fdf9c182d6
+
+[3] Voyage Score: 0.6133
+📄 SwiftEval: Developing a Language-Specific Benchmark for LLM-generated Code Evaluation
+🔍 b52e3979-3c55-45f5-b2de-461013a06219
+
+[4] Voyage Score: 0.6094
+📄 SwiftEval: Developing a Language-Specific Benchmark for LLM-generated Code Evaluation
+🔍 257c4d7e-99d2-4bef-9132-0de2e849d611
+
+[5] Voyage Score: 0.5977
+📄 SwiftEval: Developing a Language-Specific Benchmark for LLM-generated Code Evaluation
+🔍 3513ea1d-28f9-42fd-89f8-9a862d1ccfd2
+*/
+```
+
+Each approach to result fusion and reranking offers distinct advantages:
+
+**Reciprocal Rank Fusion (RRF)**
+
+- **Pros**: Simple, fast, no external dependencies, works well as a baseline
+- **Cons**: Uses only positional information, doesn't consider semantic relevance between query and documents
+- **Best for**: Quick implementation, when external services are unavailable, as a preprocessing step before advanced reranking
+
+**Cohere Reranking**
+
+- **Pros**: Sophisticated neural reranking model, good performance on diverse queries, reliable API
+- **Cons**: Additional API cost, latency overhead, requires API key management
+- **Best for**: Production systems where search quality is critical, queries requiring nuanced understanding
+
+**Voyage AI Reranking**
+
+- **Pros**: Competitive performance, optimized for retrieval tasks, good cost-effectiveness
+- **Cons**: Additional API dependency, requires careful configuration, newer service with less established track record
+- **Best for**: Cost-conscious applications, retrieval-focused use cases, when experimenting with newer reranking approaches
+
+The choice between these methods depends on your specific requirements for search quality, latency, cost, and system complexity. In practice, many applications start with RRF as a solid baseline and then evaluate whether the improved performance from neural rerankers justifies the additional complexity and cost.
+
+For optimal results, consider implementing a cascade approach, like we did here: use RRF to quickly narrow down to top candidates, then apply neural reranking to the most promising subset. This approach balances search quality with computational efficiency.

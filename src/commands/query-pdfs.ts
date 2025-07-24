@@ -115,7 +115,7 @@ export const queryPdfsCommand = new Command()
         // Build base query configuration
         const baseQuery: any = {
           top_k: limit,
-          include_attributes: ["text", "title", "author"],
+          include_attributes: ["id", "text", "title", "author"],
         };
 
         let results: any[] = [];
@@ -284,20 +284,11 @@ export const queryPdfsCommand = new Command()
           console.log(chalk.cyan(`[${index + 1}] ${scoreDisplay}`));
 
           // Display title and author if available
-          const title =
-            result.title || result.attributes?.title || "Unknown Title";
-          const author =
-            result.author || result.attributes?.author || "Unknown Author";
-          console.log(chalk.magenta(`📄 ${title}`));
-          console.log(chalk.blue(`👤 ${author}`));
+          console.log(chalk.magenta(`📄 ${result.title}`));
+          console.log(chalk.blue(`👤 ${result.author}`));
+          console.log(chalk.gray(`🔍 ${result.id}`));
 
-          // Display text content (truncated if too long)
-          const text = result.text || result.attributes?.text || "";
-          const truncatedText =
-            text.length > 100 ? text.substring(0, 100) + "..." : text;
-          console.log(chalk.white(truncatedText));
-
-          console.log(); // Empty line between results
+          console.log();
         });
       } catch (error) {
         console.error(chalk.red("❌ Error:"), error);
@@ -351,15 +342,7 @@ async function cohereRerankOrUnranked(
 
     // Prepare documents for Cohere reranking
     const docs = rows.map((r: any) => {
-      // Get text from various possible locations
-      const text = r.text || r.attributes?.text || "";
-      const title = r.title || r.attributes?.title || "";
-      const author = r.author || r.attributes?.author || "";
-
-      // Combine available text fields for better reranking
-      const combinedText = [title, author, text].filter(Boolean).join(" ");
-
-      return combinedText || "No content available";
+      return r.text;
     });
 
     console.log(
@@ -409,15 +392,7 @@ async function voyageRerankOrUnranked(
 
     // Prepare documents for Voyage reranking
     const docs = rows.map((r: any) => {
-      // Get text from various possible locations
-      const text = r.text || r.attributes?.text || "";
-      const title = r.title || r.attributes?.title || "";
-      const author = r.author || r.attributes?.author || "";
-
-      // Combine available text fields for better reranking
-      const combinedText = [title, author, text].filter(Boolean).join(" ");
-
-      return combinedText || "No content available";
+      return r.text;
     });
 
     console.log(
@@ -430,15 +405,14 @@ async function voyageRerankOrUnranked(
       model: "rerank-2-lite",
       topK: k || docs.length,
       returnDocuments: false,
-      truncation: true,
     });
 
     // Handle response structure defensively
-    const results = (reranked as any).results || (reranked as any).data || [];
+    const results = reranked.data || [];
     console.log(results);
     return results.map((r: any) => ({
       id: rows[r.index].id,
-      score: r.relevanceScore || r.score,
+      score: r.relevanceScore,
       originalResult: rows[r.index], // Keep reference to original result
     }));
   } catch (e) {
