@@ -2,12 +2,6 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                           PDF Document Collection                               │
-│                               arxiv_100.zip                                     │
-│                       https://example.com/link/to/zip                           │
-└────────────────────────────────────┬────────────────────────────────────────────┘
-                                     │
-┌────────────────────────────────────▼────────────────────────────────────────────┐
 │                           Chunking and Indexing                                 │
 │  ┌─────────────┐  ┌───────────────┐  ┌─────────────┐  ┌─────────────────────┐   │
 │  │ PDF Parsing │─▶│   Chunking    │─▶│ Embeddings  │─▶│   turbopuffer       │   │
@@ -16,10 +10,15 @@
                                      │
 ┌────────────────────────────────────▼────────────────────────────────────────────┐
 │                          Hybrid Search Retrieval                                │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐     │
-│  │   Vector     │  │ BM25 Search  │  │ Rank Fusion  │  │   Evaluation     │     │
-│  │   Search     │  │   (FTS)      │  │ (Multiple)   │  │   (NDCG, etc)    │     │
-│  └──────────────┘  └──────────────┘  └──────────────┘  └──────────────────┘     │
+│                       ┌──────────────┐                                          │
+│                    ┌─▶│   Vector     │──┐                                       │
+│                    │  │   Search     │  │                                       │
+│  ┌─────────────┐   │  └──────────────┘  │  ┌──────────────┐    ┌─────────────┐  │
+│  │ User Query  │───┤                    │─▶│ Rank Fusion  │───▶│ Re-ranking  │  │
+│  └─────────────┘   │  ┌──────────────┐  │  └──────────────┘    └─────────────┘  │
+│                    │  │ BM25 Search  │  │                                       │
+│                    └─▶│   (FTS)      │──┘                                       │
+│                       └──────────────┘                                          │
 └─────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -27,7 +26,7 @@ This expands on our [Hybrid Search guide](https://turbopuffer.com/docs/hybrid) a
 
 We will use [this collection](https://example.com/link/to/zip) of PDF papers on large language models from https://arxiv.org/ for the purposes of this guide.
 
-## Document Processing Pipeline
+## Chunking and Indexing
 
 As the source doucments are PDFs we will first need to extract their text. We'll use [LangChain](https://www.langchain.com/)'s PDF parser for this guide. We'll contrast three basic chunking strategies, generate embeddings using OpenAI's `text-embedding-3-small` model, and index everything in turbopuffer for hybrid search capabilities.
 
@@ -293,7 +292,7 @@ rrfResults.slice(0, 5).forEach((result, i) => {
 */
 ```
 
-These results are okay. They are about benchmarking LLMs, but the results focus on language and legal documents, not code. We can improve on these results even without reaching for robust reranking models (yet) by simply pulling more results!
+These results are okay. They are about benchmarking LLMs, but the results focus on language and legal documents, not code. We can improve on these results without reaching for robust reranking models (yet) by simply pulling more results!
 
 ```typescript
 // Execute both searches with top_k at 25 (up from 10)
@@ -422,26 +421,37 @@ const voyageResults = reranked.data.map((r: any) => ({
 */
 ```
 
-Each approach to result fusion and reranking offers distinct advantages:
+RRF provides speed and simplicity with no external dependencies or costs, while neural reranking offers improved accuracy at the expense of additional complexity and API costs. Note, while RRF is an excellent algorithm strategy for local re-ranking, there are many alternatives that might suit specific use cases.
 
-**Reciprocal Rank Fusion (RRF)**
+Both Cohere and Voyage performed well: Cohere placed two highly relevant SwiftEval chunks at the top positions, while Voyage identified 4 out of 5 results from the highly relevant SwiftEval paper. The neural rerankers elevated the more relevant code evaluation content above the legal benchmarking results that RRF alone ranked higher.
 
-- **Pros**: Simple, fast, no external dependencies, works well as a baseline
-- **Cons**: Uses only positional information, doesn't consider semantic relevance between query and documents
-- **Best for**: Quick implementation, when external services are unavailable, as a preprocessing step before advanced reranking
+For optimal results, consider a cascade approach like we did here: use RRF to quickly filter candidates, then apply neural reranking to refine the most promising results.
 
-**Cohere Reranking**
+## Evaluation Methodologies
 
-- **Pros**: Sophisticated neural reranking model, good performance on diverse queries, reliable API
-- **Cons**: Additional API cost, latency overhead, requires API key management
-- **Best for**: Production systems where search quality is critical, queries requiring nuanced understanding
+So far we have manually inspected search results to assess quality. While this qualitative assessment provides some insights, manual evaluation faces key limitations: subjectivity in what constitutes "good" results, impracticality at scale, inconsistency based on evaluator context, and difficulty quantifying improvements between approaches. For robust evalution, we need automated methods that can objectively compare measure quality of search results as various parts of the system are changed.
 
-**Voyage AI Reranking**
+Effective evaluation starts with creating a dataset of queries with known relevant documents. Some possible approaches to this include:
 
-- **Pros**: Competitive performance, optimized for retrieval tasks, good cost-effectiveness
-- **Cons**: Additional API dependency, requires careful configuration, newer service with less established track record
-- **Best for**: Cost-conscious applications, retrieval-focused use cases, when experimenting with newer reranking approaches
+- **Expert annotation**: Domain experts craft queries and identify relevant document chunks with relevance scores on a fixed scale. This approach works best for high-stakes applications where accuracy is critical and resources allow for manual curation.
+- **Synthetic query generation**: Use LLMs to programmatically generate queries from document chunks, creating larger evaluation datasets at scale. This approach is ideal for initial development, A/B testing, and when manual annotation is too expensive or time-consuming.
 
-The choice between these methods depends on your specific requirements for search quality, latency, cost, and system complexity. In practice, many applications start with RRF as a solid baseline and then evaluate whether the improved performance from neural rerankers justifies the additional complexity and cost.
+```typescript
+// Example evaluation query structure
+{
+  query: "effective strategies for benchmarking llm generated code quality",
+  relevant_chunks: [
+    { chunk_id: "3513ea1d-28f9-42fd-89f8-9a862d1ccfd2", relevance_score: 3 },
+    { chunk_id: "06997b72-b270-4de6-98b4-19a501283a21", relevance_score: 3 },
+    { chunk_id: "f8960925-d30e-411b-ab27-86fdf9c182d6", relevance_score: 1 }
+  ]
+}
+```
 
-For optimal results, consider implementing a cascade approach, like we did here: use RRF to quickly narrow down to top candidates, then apply neural reranking to the most promising subset. This approach balances search quality with computational efficiency.
+With the known expected results, there are several approaches to assess the quality of your search. It can be helpful to test multiple metrics:
+
+- **NDCG (Normalized Discounted Cumulative Gain)** is the gold standard for evaluating ranked retrieval results, measuring both relevance and ranking position while giving higher scores to relevant results that appear earlier.
+- **Mean Reciprocal Rank (MRR)** measures the average reciprocal rank of the first relevant result, useful for scenarios where finding any relevant result quickly is most important.
+- **Hit Rate @ K** measures the percentage of queries that have at least one relevant result in the top K, providing a simple binary success metric.
+
+For a more detailed description of these approaches and more, see [this article](https://towardsdatascience.com/metrics-that-matter-a-simple-guide-to-search-ranking-evaluation-4030084c35b4/?gi=dba5fde0cf57) from https://towardsdatascience.com.
