@@ -20,7 +20,7 @@ export const queryPdfsCommand = new Command()
   .option("-l, --limit <limit>", "Maximum number of results", "10")
   .option(
     "-r, --rerank <method>",
-    "Reranking method for hybrid search (rrf, cohere, voyage)",
+    "Reranking method for hybrid search (rrf, dbsf, cohere, voyage)",
     "rrf"
   )
   .action(
@@ -30,7 +30,7 @@ export const queryPdfsCommand = new Command()
       options: {
         type: "semantic" | "keyword" | "hybrid";
         limit: string;
-        rerank: "rrf" | "cohere" | "voyage";
+        rerank: "rrf" | "dbsf" | "cohere" | "voyage";
       }
     ) => {
       try {
@@ -208,6 +208,15 @@ export const queryPdfsCommand = new Command()
               }
               return reranked;
             });
+          } else if (rerankMethod === "dbsf") {
+            // Use DBSF
+            console.log(
+              chalk.gray("Applying Distribution-Based Score Fusion...")
+            );
+            results = distributionBasedScoreFusion([
+              vectorResults,
+              ftsResults,
+            ]).slice(0, limit);
           } else {
             // Use RRF (default)
             console.log(chalk.gray("Applying Reciprocal Rank Fusion..."));
@@ -266,6 +275,8 @@ export const queryPdfsCommand = new Command()
               scoreDisplay = `Cohere Score: ${score.toFixed(4)}`;
             } else if (rerankMethod === "voyage") {
               scoreDisplay = `Voyage Score: ${score.toFixed(4)}`;
+            } else if (rerankMethod === "dbsf") {
+              scoreDisplay = `DBSF Score: ${score.toFixed(4)}`;
             } else {
               scoreDisplay = `RRF Score: ${score.toFixed(4)}`;
             }
@@ -317,6 +328,65 @@ function reciprocalRankFusion(resultLists: any[], k: number = 60): any[] {
     .map(([docId, score]) => {
       const result = allResults[docId];
       result.$dist = score; // Store RRF score as distance for consistency
+      return result;
+    });
+}
+
+// Distribution-Based Score Fusion (DBSF) implementation
+function distributionBasedScoreFusion(resultLists: any[]): any[] {
+  const scores: { [key: string]: number } = {};
+  const allResults: { [key: string]: any } = {};
+
+  // Process each query result list
+  for (const results of resultLists) {
+    if (!results || results.length === 0) continue;
+
+    // Extract scores from results (use $dist or dist property)
+    const queryScores = results.map((result: any) => result.$dist);
+
+    // Calculate mean and standard deviation
+    const mean =
+      queryScores.reduce((sum: number, score: number) => sum + score, 0) /
+      queryScores.length;
+    const variance =
+      queryScores.reduce(
+        (sum: number, score: number) => sum + Math.pow(score - mean, 2),
+        0
+      ) / queryScores.length;
+    const stdDev = Math.sqrt(variance);
+
+    // Set limits: L = μ - 3σ, U = μ + 3σ
+    const lowerLimit = mean - 3 * stdDev;
+    const upperLimit = mean + 3 * stdDev;
+    const denominator = upperLimit - lowerLimit;
+
+    // Normalize scores for this query
+    for (let i = 0; i < results.length; i++) {
+      const id = results[i].id;
+      const score = results[i].$dist;
+      let normalizedScore: number;
+      if (denominator === 0) {
+        normalizedScore = 0.5;
+      } else if (score < lowerLimit) {
+        normalizedScore = 0;
+      } else if (score > upperLimit) {
+        normalizedScore = 1;
+      } else {
+        normalizedScore = (score - lowerLimit) / denominator;
+      }
+
+      // Sum normalized scores across queries
+      scores[id] = (scores[id] || 0) + normalizedScore;
+      allResults[id] = results[i];
+    }
+  }
+
+  // Sort by combined normalized scores (higher is better)
+  return Object.entries(scores)
+    .sort(([, a], [, b]) => b - a)
+    .map(([docId, score]) => {
+      const result = allResults[docId];
+      result.$dist = score; // Store DBSF score as distance for consistency
       return result;
     });
 }

@@ -1,8 +1,8 @@
-# Advanced Hybrid Search for PDF Documents
+# Advanced Hybrid Search
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
-│                           Chunking and Indexing                                 │
+│                          Chunking and Indexing                                  │
 │  ┌─────────────┐  ┌───────────────┐  ┌─────────────┐  ┌─────────────────────┐   │
 │  │ PDF Parsing │─▶│   Chunking    │─▶│ Embeddings  │─▶│   turbopuffer       │   │
 │  └─────────────┘  └───────────────┘  └─────────────┘  └─────────────────────┘   │
@@ -204,7 +204,7 @@ In reality, all chunking strategies shown are quite primitive and to improve res
 
 While individual vector or BM25 searches can be effective, combining them through hybrid search often yields superior results by leveraging both semantic understanding and keyword matching. Turbopuffer's `multiQuery` allows us to execute both search types simultaneously.
 
-Let's explore how to implement hybrid search using a simple local algorithm, Reciprocal Rank Fusion (RRF), and then enhance the results using external reranking services like [Cohere](https://cohere.com/rerank) and [Voyage](https://docs.voyageai.com/docs/reranker).
+We'll explore how to implement hybrid search and fuse results using a couple different algorithms, and then enhance the results using external reranking services like [Cohere](https://cohere.com/rerank) or [Voyage](https://docs.voyageai.com/docs/reranker).
 
 ```typescript
 // Hybrid search with simultaneous vector and BM25 queries
@@ -336,11 +336,96 @@ const multiQueryResult = await ns.multiQuery({
 */
 ```
 
-With this approach, results 2 and 3 seem like more direct hits for our query. By including more results in the vector and full text searches, we are now hitting documents that were in both query results, but farther down in one.
+With this approach, results 2 and 3 seem like more direct hits for our query. By including more results in the vector and full text searches, we are now hitting documents that were in both query results, but farther down the list. Before we look at reranking, let's try another algorithm to fuse results.
 
-While RRF provides a solid foundation for result fusion, external reranking services can further refine the results using more sophisticated relevance models.
+```typescript
+// ... hybrid search with top_k 25 like before
+// Merge results with Distribution-Based Score Fusion (DBSF)
+function distributionBasedScoreFusion(resultLists: any[]): any[] {
+  const scores: { [key: string]: number } = {};
+  const allResults: { [key: string]: any } = {};
 
-The examples that follow build on our `rrfResults` set generated with `top_k` set to `25` for both queries.
+  // Process each query result list
+  for (const results of resultLists) {
+    if (!results || results.length === 0) continue;
+
+    // Calculate mean (μ) and standard deviation (σ) for result set
+    const queryScores = results.map((result: any) => result.$dist);
+    const mean =
+      queryScores.reduce((sum: number, score: number) => sum + score, 0) /
+      queryScores.length;
+    const variance =
+      queryScores.reduce(
+        (sum: number, score: number) => sum + Math.pow(score - mean, 2),
+        0
+      ) / queryScores.length;
+    const stdDev = Math.sqrt(variance);
+
+    // Set limits: L = μ - 3σ, U = μ + 3σ
+    const lowerLimit = mean - 3 * stdDev;
+    const upperLimit = mean + 3 * stdDev;
+    const denominator = upperLimit - lowerLimit;
+
+    // Normalize scores for this query
+    for (let i = 0; i < results.length; i++) {
+      const id = results[i].id;
+      const score = results[i].$dist;
+      let normalizedScore: number;
+      if (denominator === 0) {
+        normalizedScore = 0.5;
+      } else if (score < lowerLimit) {
+        normalizedScore = 0;
+      } else if (score > upperLimit) {
+        normalizedScore = 1;
+      } else {
+        normalizedScore = (score - lowerLimit) / denominator;
+      }
+
+      // Sum normalized scores across queries
+      scores[id] = (scores[id] || 0) + normalizedScore;
+      allResults[id] = results[i];
+    }
+  }
+
+  // Sort by combined normalized scores (higher is better)
+  return Object.entries(scores)
+    .sort(([, a], [, b]) => b - a)
+    .map(([docId, score]) => {
+      const result = allResults[docId];
+      result.$dist = score; // Store DBSF score as distance for consistency
+      return result;
+    });
+}
+const dbsfResults = distributionBasedScoreFusion([vectorResults, ftsResults]);
+
+/* DBSF Results:
+[1] DBSF Score: 1.0711
+📄 Bench4KE: Benchmarking Automated Competency Question Generation
+🔍 71cf486c-d875-49a4-a6c4-c3805c9e450a
+
+[2] DBSF Score: 1.0000
+📄 VietMix: A Naturally Occurring Vietnamese-English Code-Mixed Corpus with Iterative Augmentation for Machine Translation
+🔍 54cf1c73-7909-43ec-b4e1-c70c18c001d9
+
+[3] DBSF Score: 0.7794
+📄 Bench4KE: Benchmarking Automated Competency Question Generation
+🔍 3ac70531-6dea-46ed-a507-0d83e206985e
+
+[4] DBSF Score: 0.7288
+📄 SwiftEval: Developing a Language-Specific Benchmark for LLM-generated Code Evaluation
+🔍 3513ea1d-28f9-42fd-89f8-9a862d1ccfd2
+
+[5] DBSF Score: 0.6997
+📄 SwiftEval: Developing a Language-Specific Benchmark for LLM-generated Code Evaluation
+🔍 06997b72-b270-4de6-98b4-19a501283a21
+*/
+```
+
+Looking at the results we can see that RRF and DBSF performed similarly. They included the same two chunks from the SwiftEval doc in the top 5 results, though RRF ranked them higher. Each algorithm offers distinct advantages: RRF excels in its simplicity and robustness, being rank-based rather than score-dependent, making it effective when score distributions are unreliable or inconsistent. DBSF, leverages the actual score distributions through statistical normalization, potentially capturing more nuanced signal when scores are well-calibrated. The choice between these fusion methods depends on your specific problem domain, the characteristics of your search systems, and the nature of your dataset. RRF tends to be a safer default choice for mixed or unknown score quality, while DBSF may provide better results when you have confidence in your scoring systems and need to capture subtle relevance distinctions. To learn more about these algorithms check out [Understanding The Math Behind RRF and DBSF with Examples](https://dev.to/irajjelodari/understanding-math-behind-rrf-and-dbsf-with-examples-4bec).
+
+While RRF and DBSF alone provide a solid foundation for result fusion, external reranking services can further refine the results using sophisticated neural relevance models.
+
+The reranking examples that follow build on our `rrfResults` set generated with `top_k` set to `25` for both queries.
 
 ```typescript
 // Cohere Reranking using rerank-english-v3.0 model
@@ -421,15 +506,13 @@ const voyageResults = reranked.data.map((r: any) => ({
 */
 ```
 
-RRF provides speed and simplicity with no external dependencies or costs, while neural reranking offers improved accuracy at the expense of additional complexity and API costs. Note, while RRF is an excellent algorithm strategy for local re-ranking, there are many alternatives that might suit specific use cases.
-
 Both Cohere and Voyage performed well: Cohere placed two highly relevant SwiftEval chunks at the top positions, while Voyage identified 4 out of 5 results from the highly relevant SwiftEval paper. The neural rerankers elevated the more relevant code evaluation content above the legal benchmarking results that RRF alone ranked higher.
 
-For optimal results, consider a cascade approach like we did here: use RRF to quickly filter candidates, then apply neural reranking to refine the most promising results.
+Local algorithms like RRF or DBSF provide speed and simplicity with no external dependencies or costs, while neural reranking offers improved accuracy at the expense of additional complexity and API costs. For optimal results, consider a cascade approach like we did here: use RRF to quickly filter candidates, then apply neural reranking to refine the most promising results.
 
 ## Evaluation Methodologies
 
-So far we have manually inspected search results to assess quality. While this qualitative assessment provides some insights, manual evaluation faces key limitations: subjectivity in what constitutes "good" results, impracticality at scale, inconsistency based on evaluator context, and difficulty quantifying improvements between approaches. For robust evalution, we need automated methods that can objectively compare measure quality of search results as various parts of the system are changed.
+So far we have manually inspected search results to assess quality. While this qualitative assessment provides some insights, manual evaluation faces key limitations: subjectivity in "good" results, impracticality at scale, and difficulty quantifying improvements. For robust evalution, we need automated methods that can objectively compare measure quality of search results as various parts of the system are changed.
 
 Effective evaluation starts with creating a dataset of queries with known relevant documents. Some possible approaches to this include:
 
@@ -448,10 +531,10 @@ Effective evaluation starts with creating a dataset of queries with known releva
 }
 ```
 
-With the known expected results, there are several approaches to assess the quality of your search. It can be helpful to test multiple metrics:
+With the known expected results, there are several approaches to assess the quality of your search, including:
 
 - **NDCG (Normalized Discounted Cumulative Gain)** is the gold standard for evaluating ranked retrieval results, measuring both relevance and ranking position while giving higher scores to relevant results that appear earlier.
 - **Mean Reciprocal Rank (MRR)** measures the average reciprocal rank of the first relevant result, useful for scenarios where finding any relevant result quickly is most important.
 - **Hit Rate @ K** measures the percentage of queries that have at least one relevant result in the top K, providing a simple binary success metric.
 
-For a more detailed description of these approaches and more, see [this article](https://towardsdatascience.com/metrics-that-matter-a-simple-guide-to-search-ranking-evaluation-4030084c35b4/?gi=dba5fde0cf57) from https://towardsdatascience.com.
+It can be helpful to test multiple metrics to get a complete picture of your search performance. To go deeper on these algorithms (and more), read [How to Evaluate Search Relevance and Ranking](https://towardsdatascience.com/metrics-that-matter-a-simple-guide-to-search-ranking-evaluation-4030084c35b4)
